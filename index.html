@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام مراقبة صحة رواد الفضاء - ناسا (متصل بقاعدة البيانات)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- استدعاء مكتبات Firebase السحابية مع إعداداتك -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+    
+    const firebaseConfig = {
+      apiKey: "AIzaSyAlYkyB6FBYuZwmQORZ9EobjuK7qjHpKuo",
+      authDomain: "nasa-space-health.firebaseapp.com",
+      projectId: "nasa-space-health",
+      storageBucket: "nasa-space-health.firebasestorage.app",
+      messagingSenderId: "611202484154",
+      appId: "1:611202484154:web:9c8d0da266a49d00f5bf83",
+      measurementId: "G-J2WPZ771LL"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    
+    window.db = db;
+    window.firebaseModules = { doc, setDoc, onSnapshot, getDoc };
+  </script>
+</head>
+<body class="bg-slate-950 text-white min-h-screen p-4 sm:p-6 flex items-center justify-center">
+
+  <!-- ================= شاشة تسجيل الدخول / إنشاء الحساب ================= -->
+  <div id="onboarding-screen" class="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-6">
+    <div class="text-center space-y-1">
+      <span class="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-3 py-1 rounded-full">NASA CLOUD // TELEMETRY</span>
+      <h1 id="form-title" class="text-xl font-bold mt-3">تسجيل دخول طاقم المهمة</h1>
+      <p id="form-desc" class="text-xs text-slate-400">أدخل رقم السوار الخاص بك للمتابعة</p>
+    </div>
+
+    <!-- زر التبديل بين تسجيل الدخول وإنشاء حساب -->
+    <div class="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs">
+      <button type="button" id="tab-login" onclick="switchMode('login')" class="flex-1 py-2 rounded-xl font-bold bg-cyan-600 text-white transition-all cursor-pointer">تسجيل دخول</button>
+      <button type="button" id="tab-signup" onclick="switchMode('signup')" class="flex-1 py-2 rounded-xl text-slate-400 transition-all cursor-pointer">حساب جديد</button>
+    </div>
+
+    <form id="onboarding-form" class="space-y-4">
+      <!-- حقل الاسم يظهر فقط في حالة إنشاء حساب جديد -->
+      <div id="name-field-container" class="hidden">
+        <label class="text-xs text-slate-400 block mb-1">اسم رائد الفضاء</label>
+        <input type="text" id="astronaut-name" placeholder="مثال: القائد زياد حمدي" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-cyan-500">
+      </div>
+
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">رقم السوار الذكي (Wristband ID)</label>
+        <input type="text" id="wristband-id" placeholder="مثال: WB-7742-NASA" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-cyan-500" required>
+      </div>
+
+      <!-- رفع الصورة يظهر فقط في حالة إنشاء حساب جديد -->
+      <div id="photo-field-container" class="hidden">
+        <label class="text-xs text-slate-400 block mb-1">صورة رائد الفضاء (اختياري)</label>
+        <input type="file" id="astronaut-photo" accept="image/*" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-500/10 file:text-cyan-400 hover:file:bg-cyan-500/20">
+      </div>
+
+      <button type="submit" id="submit-btn" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3.5 rounded-xl transition-all text-xs shadow-lg shadow-cyan-600/20 cursor-pointer">
+        دخول لوحة القيادة
+      </button>
+    </form>
+  </div>
+
+  <!-- ================= لوحة القيادة والتحكم ================= -->
+  <div id="dashboard-screen" class="w-full max-w-7xl mx-auto space-y-6 hidden">
+    <header class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-wrap justify-between items-center gap-4 shadow-xl">
+      <div class="flex items-center gap-4">
+        <div class="relative">
+          <img id="db-photo" src="" alt="Astronaut" class="w-16 h-16 rounded-2xl object-cover border-2 border-cyan-500/40">
+          <span class="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full animate-pulse"></span>
+        </div>
+        <div>
+          <span id="db-wristband" class="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2.5 py-0.5 rounded-full">WB-000</span>
+          <h2 id="db-name" class="text-xl font-bold mt-1">-</h2>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="text-left px-4 py-2 bg-slate-950/60 rounded-2xl border border-slate-800">
+          <span class="text-[10px] text-slate-400 block">حالة النظام الطبي (سحابي)</span>
+          <span id="db-global-status" class="text-xs font-mono font-bold text-emerald-400">NOMINAL (طبيعي)</span>
+        </div>
+        <button id="logout-btn" class="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs px-4 py-3 rounded-2xl transition-all cursor-pointer">
+          قطع الاتصال والخروج
+        </button>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 space-y-6">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <div>
+              <h3 class="font-bold text-sm">بيانات السوار الذكي المتزامنة (Cloud Telemetry)</h3>
+              <p class="text-xs text-slate-400">تحديث حقيقي متزامن لجميع المراقبين عبر السحابة</p>
+            </div>
+            <span class="text-[10px] font-mono text-cyan-400 animate-pulse">● CLOUD SYNCED</span>
+          </div>
+
+          <div id="metrics-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+        </div>
+      </div>
+
+      <div class="space-y-6">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
+          <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+            <h3 class="font-bold text-sm text-cyan-400">بروتوكول العلاج الذاتي (AI Triage)</h3>
+          </div>
+          <div id="protocol-content" class="space-y-3 text-xs text-slate-300">
+            <div class="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400">
+              <span class="font-bold block mb-1">كل العمليات ضمن النطاق الآمن</span>
+              لا توجد توصيات تدخل طارئ حالياً.
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="font-bold text-sm text-amber-400">ارشادات الأطباء (Medical Directory)</h3>
+            <span class="text-[10px] font-mono text-slate-500">بروتوكولات ناسا</span>
+          </div>
+          <div class="space-y-3 max-h-[250px] overflow-y-auto pl-1">
+            <div class="p-3 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+              <div class="flex justify-between items-center"><span class="font-bold text-xs text-red-400">⚠️ الاختناق ونقص الأكسجين</span><span class="text-[9px] font-mono bg-red-500/10 text-red-400 px-2 py-0.5 rounded">SpO2 < 93%</span></div>
+              <p class="text-[11px] text-slate-300"><strong>فسيولوجياً:</strong> رفع نسبة الأكسجين وربط القناع.</p>
+              <p class="text-[11px] text-slate-300"><strong>طبياً:</strong> أسيتازولاميد (Diamox) + موسع شعب.</p>
+            </div>
+            <div class="p-3 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+              <div class="flex justify-between items-center"><span class="font-bold text-xs text-orange-400">⚠️ تسارع النبض</span><span class="text-[9px] font-mono bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded">HR > 120</span></div>
+              <p class="text-[11px] text-slate-300"><strong>فسيولوجياً:</strong> إيقاف الحركة، استلقاء وتنفس عميق.</p>
+              <p class="text-[11px] text-slate-300"><strong>طبياً:</strong> حاصرات بيتا (Metoprolol).</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
